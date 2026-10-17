@@ -145,8 +145,10 @@ done
 
 # ----------------------------- 2. Resource groups ----------------------------
 log "Creating resource groups"
-az group create -n "$TFSTATE_RG" -l "$LOCATION" --tags "$TAGS" -o none && info "$TFSTATE_RG"
-az group create -n "$PROD_RG"    -l "$LOCATION" --tags "$TAGS" -o none && info "$PROD_RG"
+az group create -n "$TFSTATE_RG" -l "$LOCATION" --tags "$TAGS" -o none
+info "$TFSTATE_RG"
+az group create -n "$PROD_RG"    -l "$LOCATION" --tags "$TAGS" -o none
+info "$PROD_RG"
 
 # ----------------------------- 3. State storage ------------------------------
 log "Creating Terraform state storage account: $STATE_SA"
@@ -219,9 +221,17 @@ assign_role "$MY_OBJECT_ID" User "Storage Blob Data Contributor" "$STATE_SA_ID"
 
 # ----------------------------- 6. Federated credentials ----------------------
 log "Adding federated credentials (GitHub OIDC)"
+# GitHub may present either subject format, so trust both:
+#   classic: repo:<owner>/<repo>:...
+#   with IDs: repo:<owner>@<owner-id>/<repo>@<repo-id>:...  (IDs stop a deleted-and-recreated repo with the same name from matching)
 for repo in "${REPOS[@]}"; do
-  add_fic "gh-${repo}-pr"          "repo:${GH_OWNER}/${repo}:pull_request"
-  add_fic "gh-${repo}-${ENV_NAME}" "repo:${GH_OWNER}/${repo}:environment:${ENV_NAME}"
+  repo_id=$(gh api "repos/${GH_OWNER}/${repo}" --jq .id)
+  classic="repo:${GH_OWNER}/${repo}"
+  with_ids="repo:${GH_OWNER}@${GH_USER_ID}/${repo}@${repo_id}"
+  add_fic "gh-${repo}-pr"                 "${classic}:pull_request"
+  add_fic "gh-${repo}-${ENV_NAME}"        "${classic}:environment:${ENV_NAME}"
+  add_fic "gh-${repo}-pr-ids"             "${with_ids}:pull_request"
+  add_fic "gh-${repo}-${ENV_NAME}-ids"    "${with_ids}:environment:${ENV_NAME}"
 done
 
 # ----------------------------- 7. GitHub environments + variables ------------

@@ -13,3 +13,9 @@ variable "tags" {
     managed_by = "terraform"
   }
 }
+
+variable "frontend_url" {
+  description = "Resume site URL allowed to call the API (CORS)"
+  type        = string
+  default     = "https://stresumelvoc8r.z1.web.core.windows.net/"
+}
